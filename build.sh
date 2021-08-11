@@ -1,0 +1,1 @@
+swiftc stuff.swift -emit-library -o stuff.dylib
