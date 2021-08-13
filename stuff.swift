@@ -24,8 +24,6 @@ var render_commands = Render_Commands()
 @_cdecl ("push_rect") 
 public func push_rect (x:Float, y:Float, w:Float, h:Float, r:Float, g:Float, b:Float)
 {
-	// print (#function)
-	
 	assert(render_commands.command_count<Max_Render_Command_Count)
 
 	render_commands.commands[render_commands.command_count] = Render_Rect(x:x, y:y, w:w, h:h, r:r, g:g, b:b)
@@ -55,15 +53,40 @@ public typealias render_callback_t = @convention(c) ()->()
 
 var lastTime = Date()
 
-@_cdecl ("open_window")
-public func open_window (update_function:update_callback_t, rc:@escaping render_callback_t)
+var app:NSApplication!
+
+@_cdecl ("start_app")
+public func start_app ()
 {
-	let app = NSApplication.shared
 	let app_delegate = App_Delegate()
+	app = NSApplication.shared
 	app.delegate = app_delegate
 	app.setActivationPolicy(.regular)
 	app.finishLaunching()
+	app.activate(ignoringOtherApps:true)
 
+	// TODO: message pump independent of the windows somehow??
+
+	// while (running)
+	// {
+	//     var event:NSEvent?
+	//     repeat {
+	//         event = app.nextEvent(matching: .any, until: nil, inMode: .default, dequeue: true)
+	        
+	//         if event != nil { app.sendEvent(event!) }
+
+	//     } while(event != nil)
+
+	//     t -= lastTime.timeIntervalSinceNow
+	//     lastTime = Date()
+
+	//     update_function (Float(t))
+	// }
+}
+
+@_cdecl ("open_window")
+public func open_window (update_function:update_callback_t, rc:@escaping render_callback_t)
+{
 	let frame = NSRect(x:0, y: 0, width: 1024, height: 768)
 	let delegate = Window_Delegate()
 	let window = NSWindow(contentRect: frame, styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
@@ -85,8 +108,6 @@ public func open_window (update_function:update_callback_t, rc:@escaping render_
 	window.center()
 	window.orderFrontRegardless()
 	window.contentView?.updateTrackingAreas()
-
-	app.activate(ignoringOtherApps:true)
 
 	running = true
 
@@ -205,15 +226,22 @@ private class Renderer: NSObject, MTKViewDelegate
         self.commandQueue = device.makeCommandQueue()!
         super.init()
 
-        let shader = read_file(path:"shaders.metal")
+        // OLD VERSION: Just compile from a shader file
+        // let shader = read_file(path:"shaders.metal")
+        // self.device.makeLibrary(source: shader!, options: nil) { library, error in
+        //     if library == nil { fatalError("Couldn't create metal library: \(String(describing:error))") }
+        //     self.library = library!
+        //     self.init_callback()
+        // }
 
-        self.device.makeLibrary(source: shader!, options: nil) { library, error in
-            if library == nil { fatalError("Couldn't create metal library: \(String(describing:error))") }
-            self.library = library!
-            self.init_callback()
+
+        if let l = try? self.device.makeLibrary(filepath: "shaders.metallib") {
+        	self.library = l
+        	self.init_callback()
         }
     }
 
+    // TODO: Try using this 
     func init_callback ()
     {   
         vertex_shader   = library.makeFunction(name:"vertex_func")
