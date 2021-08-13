@@ -2,22 +2,25 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-
 void update (float t);
 void render ();
-void (*push_rect)(float, float, float, float, float, float, float);
-void (*open_window)();
+void (*push_rect) (float, float, float, float, float, float, float);
+void (*open_window) ();
+void (*start_app) ();
+
 
 int main ()
 {
 	void  *handle = dlopen("stuff.dylib", RTLD_NOW);
 	
-	open_window = dlsym(handle, "open_window");
-	push_rect = dlsym(handle, "push_rect");
+	open_window  = dlsym(handle, "open_window");
+	push_rect	 = dlsym(handle, "push_rect");
+	start_app    = dlsym(handle, "start_app");
 
+	start_app();
 	open_window(update, render);
-	
-	printf("window has been opened. Are we still running here?\n");
+
+	printf("All done\n");
 
 	return 0;
 }
