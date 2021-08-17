@@ -4,7 +4,7 @@
 
 void update (float t);
 void render ();
-void (*push_rect) (float, float, float, float, float, float, float);
+void (*push_rect) (float, float, float, float, float, float, float, float, uint16_t);
 void (*open_window) ();
 void (*start_app) ();
 
@@ -33,8 +33,9 @@ void update (float t)
 void render ()
 {
 	// printf("render called\n");
-	push_rect(0.1,0.1, 0.2,0.2, 1.0,0.0,0.0);
-	push_rect(0.0,0.0, 0.02,0.02, 1.0,0.0,0.0);
-	push_rect(0.9,0.5, 0.1,0.5, 1.0,0.0,0.0);
+
+	push_rect(0.1,0.1, 0.2,0.2, 1.0,0.0,0.0,1.0, 0);
+	push_rect(0.0,0.0, 0.1,0.1, 0.0,1.0,0.0,1.0, 0);
+	push_rect(0.9,0.5, 0.1,0.5, 1.0,0.0,1.0,1.0, 0);
 }
 

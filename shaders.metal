@@ -2,18 +2,28 @@
 
 using namespace metal;
 
-vertex float4 vertex_func (
-    constant packed_float3 *vertices  [[ buffer(0) ]], 
-    constant packed_float2 *positions [[ buffer(1) ]],
-    uint vid [[ vertex_id ]]) 
+struct Vertex
 {
-    return float4(vertices[vid].xy*2.0-1.0, 0.0, 1.0);
+    float4      position [[ position ]];
+    float4      colour;
+    //float2      uv;
+    //uint16_t    texture;
+};
+
+vertex Vertex vertex_func (
+    constant Vertex *vertices [[ buffer(0) ]],
+    uint vid [[ vertex_id ]])
+{
+    Vertex v = vertices[vid];
+    v.position.xy = v.position.xy * 2.0 - 1.0;
+    return v;
 }
 
-fragment half4 fragment_func ()
+fragment float4 fragment_func (Vertex in [[stage_in]])
 {
-    return half4(0.7, 1, 1, 1);
+    return in.colour;
 }
+
 
 //
 // These sporadically crop up:
