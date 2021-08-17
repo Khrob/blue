@@ -2,3 +2,4 @@
 *.air
 *.dylib
 /blue
+/.DS_Store
