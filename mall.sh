@@ -1,4 +1,5 @@
 ./mlib.sh
-./mm.sh
-./build.sh
+./mc.sh
+./mplat.sh
+
 ./blue

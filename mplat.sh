@@ -1,0 +1,1 @@
+swiftc blue.swift -emit-library -o stuff.dylib

@@ -27,6 +27,12 @@ struct Vertex
 	//var texture  : UInt16
 }
 
+struct Input
+{
+	var mouse_position = SIMD2<Float>(0,0)
+	var mouse_down : Bool = false
+}
+
 let Max_Render_Command_Count = 4096
 
 struct Render_Commands
@@ -106,7 +112,7 @@ private class Window_Delegate : NSObject, NSWindowDelegate
     func windowWillClose(_ notification: Notification) { running = false }
 }
 
-public typealias update_callback_t = @convention(c) (Float) -> ()
+public typealias update_callback_t = @convention(c) (Float, UnsafeMutableRawPointer) -> ()
 public typealias render_callback_t = @convention(c) ()->()
 
 var lastTime = Date()
@@ -122,24 +128,6 @@ public func start_app ()
 	app.setActivationPolicy(.regular)
 	app.finishLaunching()
 	app.activate(ignoringOtherApps:true)
-
-	// TODO: message pump independent of the windows somehow??
-
-	// while (running)
-	// {
-	//     var event:NSEvent?
-	//     repeat {
-	//         event = app.nextEvent(matching: .any, until: nil, inMode: .default, dequeue: true)
-	        
-	//         if event != nil { app.sendEvent(event!) }
-
-	//     } while(event != nil)
-
-	//     t -= lastTime.timeIntervalSinceNow
-	//     lastTime = Date()
-
-	//     update_function (Float(t))
-	// }
 }
 
 @_cdecl ("open_window")
@@ -161,7 +149,7 @@ public func open_window (update_function:update_callback_t, rc:@escaping render_
 	metal_view.delegate = renderer
 	
 	window.delegate = delegate
-	window.title = "base"
+	window.title = "blue"
 	window.contentView = metal_view
 	window.center()
 	window.orderFrontRegardless()
@@ -169,6 +157,7 @@ public func open_window (update_function:update_callback_t, rc:@escaping render_
 
 	running = true
 
+	// TODO: Move the message pump somewhere independent of the windows??
 	while (running)
 	{
 	    var event:NSEvent?
@@ -182,10 +171,11 @@ public func open_window (update_function:update_callback_t, rc:@escaping render_
 	    t -= lastTime.timeIntervalSinceNow
 	    lastTime = Date()
 
-	    update_function (Float(t))
+	    update_function (Float(t), &input)
 	}
 }
 
+var input = Input()
 
 private class Window_View : MTKView
 {
@@ -229,16 +219,18 @@ private class Window_View : MTKView
     {
         // print(#function)
         super.mouseDown(with: event)
+        input.mouse_down = true
         mouse_event(event)
-        // input.mouse_down = true
+        
     }
     
     override func mouseUp(with event: NSEvent)
     {
         // print(#function)
         super.mouseUp(with: event)
+        input.mouse_down = false
         mouse_event(event)
-        // input.mouse_down = false
+        
     }
 
     func mouse_event (_ event:NSEvent)
@@ -246,13 +238,8 @@ private class Window_View : MTKView
         let window_size = event.window!.contentView!.bounds.size
         let point = CGPoint(x: event.locationInWindow.x / window_size.width, y: 1 - event.locationInWindow.y / window_size.height)
 
-        print (point)
-
-        // input.mouse_old_x = input.mouse_x
-        // input.mouse_old_x = input.mouse_y
-
-        // input.mouse_x = Float(point.x)
-        // input.mouse_y = Float(point.y)
+        input.mouse_position.x = Float(point.x)
+        input.mouse_position.y = Float(point.y)
     }
 }
 
@@ -308,18 +295,16 @@ private class Renderer: NSObject, MTKViewDelegate
 
     func draw(in view: MTKView)
     {
-    	if (pipelineState == nil) { 
-    		print("invalid pipelineState")
-        	return 
-        }
+    	if (pipelineState == nil) { print("invalid pipelineState"); return }
+
+    	// Varying background so we know we're doing something
         struct Color { var red, green, blue, alpha: Double }
         let color = Color(red: sin(t), green: 0.75, blue: 1.0, alpha: 1.0)
         view.clearColor = MTLClearColorMake(color.red, color.green, color.blue, color.alpha)
         
+
         let render_pass_descriptor:MTLRenderPassDescriptor = view.currentRenderPassDescriptor!
-
         let command_buffer = commandQueue.makeCommandBuffer()
-
         let render_encoder:MTLRenderCommandEncoder = (command_buffer?.makeRenderCommandEncoder(descriptor: render_pass_descriptor))!
 
         render_encoder.setRenderPipelineState(pipelineState)
@@ -342,14 +327,16 @@ private class Renderer: NSObject, MTKViewDelegate
         	push_vertex(&vertices, x:c.x,     y:c.y+c.h, r:c.r, g:c.g, b:c.b, a:c.a)
         	push_vertex(&vertices, x:c.x+c.w, y:c.y,     r:c.r, g:c.g, b:c.b, a:c.a)
         	push_vertex(&vertices, x:c.x+c.w, y:c.y+c.h, r:c.r, g:c.g, b:c.b, a:c.a)
+        }
 
-        	let data_size = vertices.vertex_count * MemoryLayout.size(ofValue: vertices.vertices[0])
+        let data_size = vertices.vertex_count * MemoryLayout.size(ofValue: vertices.vertices[0])
         	vertex_buffer = device.makeBuffer(bytes: vertices.vertices, length: data_size, options: [])
         	render_encoder.setVertexBuffer(vertex_buffer, offset: 0, index: 0)
         	render_encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: vertices.vertex_count, instanceCount: 1)
-        }
 
         // /user submitted commands
+
+
 
         render_encoder.endEncoding()
 
@@ -357,27 +344,4 @@ private class Renderer: NSObject, MTKViewDelegate
         command_buffer!.commit()
     }
 }
-
-
-func read_file (path:String) -> String?
-{
-    let file = fopen(path, "r")
-    defer { fclose(file) }
-
-    fseek(file, 0, SEEK_END)
-    let file_size = ftell(file)
-    fseek(file, 0, SEEK_SET)
-
-    let pointer = UnsafeMutableRawPointer.allocate(byteCount: file_size, alignment: 1)
-    defer { pointer.deallocate() }
-
-    let read_bytes = fread(pointer, 1, file_size, file)
-    if read_bytes != file_size { return nil }
-
-    let s = String(cString: pointer.bindMemory(to: Int8.self, capacity: file_size)) 
-    return s
-}
-
-
-
 
