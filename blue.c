@@ -23,9 +23,8 @@ typedef struct UI_State {
 	
 	float 	mx,my;
 	float 	sx,sy,ex,ey;
-	bool 	just_down;
-	bool 	mouse_down;
-	
+	bool 	just_down,just_up;
+	bool 	mouse_down;	
 } 
 UI_State;
 
@@ -35,7 +34,7 @@ void (*push_rect) (float, float, float, float, float, float, float, float, uint1
 void (*open_window) ();
 void (*start_app) ();
 
-struct UI_State ui_state;
+UI_State ui_state;
 
 #pragma function(memcpy)
 void *memcpy(void *destination, void const *source, size_t size)
@@ -73,6 +72,15 @@ void update (float t, void *input)
 	ui_state.mx = i->mx;
 	ui_state.my = i->my;
 
+
+	// TODO (khrob): move this into the render callback,
+	// just update the position and the down/up status
+	// in here.
+	
+	if (ui_state.just_up && !i->mouse_down) {
+		ui_state.just_up = false;
+	}
+
 	if (i->mouse_down) {
 
 		if (!ui_state.mouse_down) {
@@ -86,6 +94,7 @@ void update (float t, void *input)
 	} else {
 
 		if (ui_state.mouse_down) {
+			ui_state.just_up = true;
 			ui_state.mouse_down = false;
 			printf("mouse up\n");
 		}
@@ -105,15 +114,16 @@ void update (float t, void *input)
 	}
 }
 
-bool button (UI_State i, float x, float y, float w, float h)
+bool button (UI_State uis, float x, float y, float w, float h)
 {
 	Colour c = {};
-	c.a = 1.0;
+
 	bool clicked = false;
 
-	if (i.mx > x && i.mx < x+w && 
-		i.my > y && i.my < y+h) {
-		c.r = i.mouse_down ? 0.75 : 0.5;
+	if (uis.mx > x && uis.mx < x+w && 
+		uis.my > y && uis.my < y+h) {
+		c.r = uis.mouse_down ? 0.75 : 0.5;
+		clicked = uis.just_up;
 	} else { 
 		c.r = 0.2; 
 	}
@@ -129,7 +139,9 @@ void render_timeline (UI_State uis)
 		push_rect(0,0.7, 1,0.3, 0.75,0.75,0.75,1, 0);
 	}
 
-	button (ui_state, 0.2,0.2, 0.6,0.1);
+	if (button (ui_state, 0.2,0.2, 0.6,0.1)) {
+		printf("Button pressed!\n");
+	}
 }
 
 void render ()
