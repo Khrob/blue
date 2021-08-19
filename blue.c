@@ -2,12 +2,32 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+// TODO (khrob): move the platform stuff into a header somewhere?
 
 typedef struct Input
 {
-	float x,y;
-	bool  mouse_down;
-} Input;
+	float 		mx,my;
+	bool  		mouse_down;
+	uint16_t 	window_width,window_height;
+} 
+Input;
+
+// TODO (khrob): colour space
+typedef struct Colour
+{
+	float r,g,b,a;
+} 
+Colour;
+
+typedef struct UI_State {
+	
+	float 	mx,my;
+	float 	sx,sy,ex,ey;
+	bool 	just_down;
+	bool 	mouse_down;
+	
+} 
+UI_State;
 
 void update (float t, void *input);
 void render ();
@@ -15,10 +35,22 @@ void (*push_rect) (float, float, float, float, float, float, float, float, uint1
 void (*open_window) ();
 void (*start_app) ();
 
+struct UI_State ui_state;
+
+#pragma function(memcpy)
+void *memcpy(void *destination, void const *source, size_t size)
+{
+    unsigned char *s = (unsigned char *)source;
+    unsigned char *d = (unsigned char *)destination;
+    while(size--) *d++ = *s++;
+
+    return(destination);
+}
+
 
 int main ()
 {
-	void  *handle = dlopen("stuff.dylib", RTLD_NOW);
+	void *handle = dlopen("stuff.dylib", RTLD_NOW);
 	
 	open_window  = dlsym(handle, "open_window");
 	push_rect	 = dlsym(handle, "push_rect");
@@ -32,34 +64,77 @@ int main ()
 	return 0;
 }
 
-float sx,sy,ex,ey;
-bool just_down = false;
+
 
 void update (float t, void *input)
 {
 	Input *i = ((Input *)input);
 
-	if (!i->mouse_down) { just_down = false; }
+	ui_state.mx = i->mx;
+	ui_state.my = i->my;
 
-	if (i->mouse_down && !just_down) {
-		just_down = true;
-		sx = i->x;
-		sy = i->y;
-		printf("c: %f,%f\n", i->x, i->y);
+	if (i->mouse_down) {
+
+		if (!ui_state.mouse_down) {
+			printf("mouse down!\n");
+			ui_state.just_down = true;
+			ui_state.mouse_down = true;
+		} 
+		else if (ui_state.just_down) {
+			ui_state.just_down = false;
+		}
+	} else {
+
+		if (ui_state.mouse_down) {
+			ui_state.mouse_down = false;
+			printf("mouse up\n");
+		}
 	}
 
-	if (just_down && i->mouse_down) {
-		ex = i->x;
-		ey = i->y;
+
+	// Test the dragging functionality
+
+	if (ui_state.just_down) {
+		ui_state.sx = i->mx;
+		ui_state.sy = i->my;
 	}
+
+	if (ui_state.mouse_down) {
+		ui_state.ex = i->mx;
+		ui_state.ey = i->my;
+	}
+}
+
+bool button (UI_State i, float x, float y, float w, float h)
+{
+	Colour c = {};
+	c.a = 1.0;
+	bool clicked = false;
+
+	if (i.mx > x && i.mx < x+w && 
+		i.my > y && i.my < y+h) {
+		c.r = i.mouse_down ? 0.75 : 0.5;
+	} else { 
+		c.r = 0.2; 
+	}
+	push_rect(x,y, w,h, c.r, c.g, c.b, c.a, 0);
+	return clicked;
+}
+
+void render_timeline (UI_State uis)
+{
+	if (uis.my > 0.7) {
+		push_rect(0,0.7, 1,0.3, 0.5,0.5,0.5,1, 0);
+	} else { 
+		push_rect(0,0.7, 1,0.3, 0.75,0.75,0.75,1, 0);
+	}
+
+	button (ui_state, 0.2,0.2, 0.6,0.1);
 }
 
 void render ()
 {
-	// push_rect(0.1,0.1, 0.2,0.2, 1.0,0.0,0.0,1.0, 0);
-	// push_rect(0.0,0.0, 0.1,0.1, 0.0,1.0,0.0,1.0, 0);
-	// push_rect(0.9,0.5, 0.1,0.5, 1.0,0.0,1.0,1.0, 0);
-
-	push_rect(sx,sy, ex-sx, ey-sy, 0,0,1,1, 0);
+	render_timeline(ui_state);
+	push_rect(ui_state.sx,ui_state.sy, ui_state.ex-ui_state.sx, ui_state.ey-ui_state.sy, 0,0,1,.1, 0);
 }
 

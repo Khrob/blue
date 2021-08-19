@@ -29,29 +29,41 @@ struct Vertex
 
 struct Input
 {
-	var mouse_position = SIMD2<Float>(0,0)
-	var mouse_down : Bool = false
-}
-
-let Max_Render_Command_Count = 4096
+	var mouse_position 	: SIMD2<Float>	= SIMD2<Float>(0,0)
+	var mouse_down 		: Bool 			= false
+	var window_width 	: UInt16  		= 0
+	var window_height 	: UInt16		= 0
+}	
 
 struct Render_Commands
 {
-	var command_count : Int = 0
-	var commands = [Render_Rect](repeating: Render_Rect(), count:Max_Render_Command_Count)
+	var command_count 	: Int = 0
+	var commands 		= [Render_Rect](repeating: Render_Rect(), count:Max_Render_Command_Count)
 }
-
-var render_commands = Render_Commands()
-
-let Max_Vertex_Count = Max_Render_Command_Count * 6
 
 struct Vertices
 {
-	var vertex_count : Int = 0
-	var vertices = [Vertex](repeating: Vertex(), count:Max_Vertex_Count)
+	var vertex_count 	: Int = 0
+	var vertices	 	= [Vertex](repeating: Vertex(), count:Max_Vertex_Count)
 }
 
+let Max_Render_Command_Count = 4096
+let Max_Vertex_Count = Max_Render_Command_Count * 6
+
+var render_commands = Render_Commands()
 var vertices = Vertices()
+var input = Input()
+
+var running = false
+var t = 0.0
+
+public typealias update_callback_t = @convention(c) (Float, UnsafeMutableRawPointer) -> ()
+public typealias render_callback_t = @convention(c) ()->()
+
+
+var lastTime = Date()
+
+var app:NSApplication!
 
 func push_vertex (_ v:inout Vertices, x:Float, y:Float, r:Float, g:Float, b:Float, a:Float)
 {
@@ -94,8 +106,6 @@ public func push_rect (x:Float, y:Float, w:Float, h:Float, r:Float, g:Float, b:F
 	render_commands.command_count += 1
 }
 
-private var running = false
-private var t = 0.0
 
 private class App_Delegate: NSObject, NSApplicationDelegate 
 {
@@ -112,12 +122,7 @@ private class Window_Delegate : NSObject, NSWindowDelegate
     func windowWillClose(_ notification: Notification) { running = false }
 }
 
-public typealias update_callback_t = @convention(c) (Float, UnsafeMutableRawPointer) -> ()
-public typealias render_callback_t = @convention(c) ()->()
 
-var lastTime = Date()
-
-var app:NSApplication!
 
 @_cdecl ("start_app")
 public func start_app ()
@@ -128,14 +133,20 @@ public func start_app ()
 	app.setActivationPolicy(.regular)
 	app.finishLaunching()
 	app.activate(ignoringOtherApps:true)
+
+	input.window_width = 512
+	input.window_height = 384
 }
 
 @_cdecl ("open_window")
 public func open_window (update_function:update_callback_t, rc:@escaping render_callback_t)
 {
-	let frame = NSRect(x:0, y: 0, width: 1024, height: 768)
+	let frame = NSRect(x:0, y:0, width:Int(input.window_width), height:Int(input.window_height))
 	let delegate = Window_Delegate()
-	let window = NSWindow(contentRect: frame, styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
+	let window = NSWindow(
+		contentRect: frame, 
+		styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, 
+		defer: false)
 
 	let metal_view = Window_View(frame:frame, device:MTLCreateSystemDefaultDevice())
 	metal_view.colorPixelFormat = .bgra8Unorm
@@ -175,7 +186,6 @@ public func open_window (update_function:update_callback_t, rc:@escaping render_
 	}
 }
 
-var input = Input()
 
 private class Window_View : MTKView
 {
@@ -290,6 +300,8 @@ private class Renderer: NSObject, MTKViewDelegate
     func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize)
     {
         print ("\(#function) \(size)")
+        input.window_width  = UInt16(size.width)
+        input.window_height = UInt16(size.height)
         (view as! Window_View).updateTrackingAreas()
     }
 
