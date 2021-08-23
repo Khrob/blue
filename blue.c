@@ -193,7 +193,7 @@ void render ()
 
 int main ()
 {
-	void *handle = dlopen("stuff.dylib", RTLD_NOW);
+	void *handle = dlopen("platform.dylib", RTLD_NOW);
 	
 	open_window  = dlsym(handle, "open_window");
 	push_rect	 = dlsym(handle, "push_rect");

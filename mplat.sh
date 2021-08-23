@@ -1,1 +1,1 @@
-swiftc blue.swift -emit-library -o stuff.dylib
+swiftc blue.swift -emit-library -o platform.dylib
