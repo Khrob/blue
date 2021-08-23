@@ -29,6 +29,7 @@ struct Vertex
 
 struct Input
 {
+	// Using SIMD<> to make sure the memory is aligned as expected
 	var mouse_position 	: SIMD2<Float>	= SIMD2<Float>(0,0)
 	var mouse_down 		: Bool 			= false
 	var window_width 	: UInt16  		= 0
