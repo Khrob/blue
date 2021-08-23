@@ -38,17 +38,21 @@ Colour;
 
 typedef struct State 
 {	
+	// Memory
+	Memory_Arena   *permanent;
+	Memory_Arena   *temporary;
+
+	// Input
 	float 			mx,my;
 	float 			sx,sy,ex,ey;
 	bool 			just_down,just_up;
-	bool 			mouse_down;	
+	bool 			dragging;
+
+	// UI Elements
 	uint32_t		hot_element;
-	Memory_Arena   *permanent;
-	Memory_Arena   *temporary;
+	
 } 
 State;
-
-State state;
 
 typedef struct UI_Element
 {
@@ -66,6 +70,7 @@ typedef struct Elements
 } 
 Elements;
 
+State *state = NULL;
 
 Memory_Arena *create_memory_arena (size_t size)
 {
@@ -82,7 +87,7 @@ Memory_Arena *create_memory_arena (size_t size)
 	return arena;
 }
 
-#define push_struct (arena, type) (type *)push_size_(arena, sizeof(type))
+#define push_struct(arena, type) (type *)push_size_(arena, sizeof(type))
 
 void* push_size_ (Memory_Arena *arena, size_t size)
 {
@@ -102,13 +107,13 @@ void* memcpy (void *destination, void const *source, size_t size)
     return(destination);
 }
 
-bool button (float x, float y, float w, float h)
+bool button (float x, float y, float w, float h, State state)
 {
 	Colour c = {};
 	bool clicked = false;
 
 	if (state.mx > x && state.mx < x+w  &&  state.my > y && state.my < y+h) {
-		c.r = state.mouse_down ? 0.75 : 0.5;
+		c.r = state.dragging ? 0.75 : 0.5;
 		clicked = state.just_up;
 	} else { 
 		c.r = 0.2; 
@@ -117,81 +122,69 @@ bool button (float x, float y, float w, float h)
 	return clicked;
 }
 
-void setup_ui ()
+bool dragger (float x, float y, float w, float h, State state)
 {
 
 }
+
 
 void update (float t, void *input)
 {
 	Input *i = ((Input *)input);
 
-	state.mx = i->mx;
-	state.my = i->my;
+	state->mx = i->mx;
+	state->my = i->my;
 
-	if (state.just_up && !i->mouse_down) {
-		state.just_up = false;
+	if (state->just_up && !i->mouse_down) {
+		state->just_up = false;
 	}
 
 	if (i->mouse_down) {
 
-		if (!state.mouse_down) {
+		if (!state->dragging) {
 			printf("mouse down!\n");
-			state.just_down  = true;
-			state.mouse_down = true;
+			state->just_down = true;
+			state->dragging  = true;
+			state->sx = i->mx;
+			state->sy = i->my;
 		} 
-		else if (state.just_down) {
-			state.just_down = false;
-		}
-	} else {
+		
+		state->ex = i->mx;
+		state->ey = i->my;
+	} 
+	else {
 
-		if (state.mouse_down) {
-			state.just_up    = true;
-			state.mouse_down = false;
+		if (state->dragging) {
+			state->just_up  = true;
+			state->dragging = false;
 			printf("mouse up\n");
 		}
 	}
 
-	// Test the dragging functionality
-
-	if (state.just_down) {
-		state.sx = i->mx;
-		state.sy = i->my;
-	}
-
-	if (state.mouse_down) {
-		state.ex = i->mx;
-		state.ey = i->my;
-	}
-
-	setup_ui ();
-
-	state.just_up = false;
-	state.just_down = false;
+	state->just_up   = false;
+	state->just_down = false;
 }
 
-
-void render_timeline ()
+void render_timeline (State *state)
 {
-	if (state.my > 0.7) {
+	if (state->my > 0.7) {
 		push_rect(0,0.7, 1,0.3, 0.5,0.5,0.5,1, 0);
 	} else { 
 		push_rect(0,0.7, 1,0.3, 0.75,0.75,0.75,1, 0);
 	}
 
-	if (button (0.2,0.2, 0.6,0.1)) {
+	if (button (0.2,0.2, 0.6,0.1, *state)) {
 		printf("Button pressed!\n");
 	}
 }
 
 void render ()
 {
-	render_timeline();
-	push_rect(state.sx,state.sy, state.ex-state.sx, state.ey-state.sy, 0,0,1,.1, 0);
+	render_timeline(state);
+	push_rect(state->sx,state->sy, state->ex-state->sx, state->ey-state->sy, 0,0,1,.1, 0);
 }
 
-
-int main ()
+int main (void)
 {
 	void *handle = dlopen("platform.dylib", RTLD_NOW);
 	
@@ -199,8 +192,11 @@ int main ()
 	push_rect	 = dlsym(handle, "push_rect");
 	start_app    = dlsym(handle, "start_app");
 
-	state.permanent = create_memory_arena(MB(16));
-	state.temporary = create_memory_arena(MB(16));
+	Memory_Arena *bootstrap = create_memory_arena(MB(16));
+	state = push_struct(bootstrap, State);
+	state->permanent = bootstrap;
+
+	state->temporary = create_memory_arena(MB(16));
 
 	start_app();
 	open_window(update, render);
