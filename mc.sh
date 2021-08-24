@@ -1,1 +1,1 @@
-clang blue.c -o blue -std=c17
+clang blue.c -std=c17 -g -Wall -o blue 
