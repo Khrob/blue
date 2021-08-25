@@ -61,9 +61,6 @@ var t = 0.0
 public typealias update_callback_t = @convention(c) (Float, UnsafeMutableRawPointer) -> ()
 public typealias render_callback_t = @convention(c) ()->()
 
-
-var lastTime = Date()
-
 var app:NSApplication!
 
 func push_vertex (_ v:inout Vertices, x:Float, y:Float, r:Float, g:Float, b:Float, a:Float)
@@ -153,8 +150,8 @@ public func open_window (update_function:update_callback_t, rc:@escaping render_
 	metal_view.colorPixelFormat = .bgra8Unorm
 	metal_view.depthStencilPixelFormat = .depth32Float
 	metal_view.preferredFramesPerSecond = 60
-	metal_view.isPaused = false
-	metal_view.enableSetNeedsDisplay = false
+	metal_view.isPaused = true
+	metal_view.enableSetNeedsDisplay = true
 	
 	let renderer = Renderer(device: metal_view.device!)
 	renderer.render_function = rc
@@ -169,6 +166,10 @@ public func open_window (update_function:update_callback_t, rc:@escaping render_
 
 	running = true
 
+
+	var lastTime = Date()
+	var frame_counter : Double = 0
+
 	// TODO: Move the message pump somewhere independent of the windows??
 	while (running)
 	{
@@ -180,7 +181,16 @@ public func open_window (update_function:update_callback_t, rc:@escaping render_
 
 	    } while(event != nil)
 
-	    t -= lastTime.timeIntervalSinceNow
+	    let delta = lastTime.timeIntervalSinceNow
+	    t -= delta
+	    frame_counter -= delta
+
+	    // Only draw (roughly) every 60th of a second.
+	    if (frame_counter > 1.0/60.0) {
+	    	metal_view.setNeedsDisplay(metal_view.bounds)
+	    	frame_counter = 0.0
+	    }
+
 	    lastTime = Date()
 
 	    update_function (Float(t), &input)
@@ -194,7 +204,7 @@ private class Window_View : MTKView
 
     override func updateTrackingAreas()
     {
-        print(#function)
+        // print(#function)
         if tracking_area != nil { removeTrackingArea(tracking_area!) }
         tracking_area = NSTrackingArea(rect: self.bounds, options: [.activeAlways, .mouseMoved] , owner: self, userInfo: nil)
         addTrackingArea(tracking_area!)
@@ -264,7 +274,6 @@ private class Renderer: NSObject, MTKViewDelegate
     var vertex_shader:MTLFunction!
     var fragment_shader:MTLFunction!
     var pipelineState: MTLRenderPipelineState!
-    var last_frame_time:Date = Date()
     var vertex_buffer: MTLBuffer!
 
     init (device: MTLDevice)
@@ -300,7 +309,7 @@ private class Renderer: NSObject, MTKViewDelegate
     
     func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize)
     {
-        print ("\(#function) \(size)")
+        // print ("\(#function) \(size)")
         input.window_width  = UInt16(size.width)
         input.window_height = UInt16(size.height)
         (view as! Window_View).updateTrackingAreas()

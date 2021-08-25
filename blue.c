@@ -3,29 +3,10 @@
 #include <stdlib.h>
 #include <assert.h>
 
-
-// Functions in the platform layer
-void (*push_rect) (float, float, float, float, float, float, float, float, uint16_t);
-void (*open_window) ();
-void (*start_app) ();
-
-#define KB(value) (  (value)*1024LL)
-#define MB(value) (KB(value)*1024LL)
-#define GB(value) (MB(value)*1024LL)
-#define TB(value) (GB(value)*1024LL)
-
-#define max(a,b) (a > b ? a : b)
-#define min(a,b) (a > b ? b : a)
+#include "platform.h"
+#include "edit.h"
 
 #define MAX_UI_DRAWABLES 256
-
-typedef struct Memory_Arena
-{
-	size_t		bytes_used;
-	void*       bytes; 	
-	size_t		size;
-} 
-Memory_Arena;
 
 typedef struct Input
 {
@@ -86,41 +67,7 @@ typedef struct State
 State;
 
 State *state = NULL;
-
-Memory_Arena *create_memory_arena (size_t size)
-{
-	Memory_Arena *arena = malloc(sizeof(Memory_Arena));
-
-	assert (arena != NULL);
-
-	arena->bytes_used = 0;
-	arena->bytes = malloc(size);
-	arena->size = size;
-
-	assert(arena->bytes != NULL);
-
-	return arena;
-}
-
-#define push_struct(arena, type) 		(type *)push_size_(arena, sizeof(type))
-#define push_array(arena, type, count) 	(type *)push_size_(arena, sizeof(type)*count)
-
-void*   push_size_ (Memory_Arena *arena, size_t size)
-{
-	assert (arena->bytes_used+size < arena->size);
-	void *base = arena->bytes+arena->bytes_used;
-	arena->bytes_used += size;
-	return base;
-}
-
-void* memcpy (void *destination, void const *source, size_t size)
-{
-    unsigned char *s = (unsigned char *)source;
-    unsigned char *d = (unsigned char *)destination;
-    while(size--) *d++ = *s++;
-
-    return(destination);
-}
+Edit_Project *project;
 
 void push_ui_drawable (float x, float y, float w, float h, float r, float g, float b, float a, UI_Drawables *drawables)
 {
@@ -144,10 +91,13 @@ void push_ui_drawable (float x, float y, float w, float h, float r, float g, flo
 	drawables->count++;
 }
 
-bool button (float x, float y, float w, float h, uint16_t id, State *state)
+bool button (float x, float y, uint16_t id, State *state)
 {
 	Colour c = {0.2,0,0,1};
 	bool clicked = false;
+
+	float w = state->layout.divider_height_in_pixels / state->window_width * 0.8;  
+	float h = state->layout.divider_height_in_pixels / state->window_height * 0.8;
 
 	if (state->mx > x && state->mx < x+w  &&  state->my > y && state->my < y+h) {
 		c.r = state->dragging ? 0.75 : 0.5;
@@ -177,7 +127,7 @@ void dragger (uint16_t id, State *state)
 		if (state->just_down) {
 			state->hot_element = id;
 			state->oy = state->my - y;
-			printf("Started dragging\n");
+			//printf("Started dragging\n");
 		}
 	}
 	
@@ -188,15 +138,35 @@ void render_timeline (State *state)
 {
 	Colour c = {0.5,0.5,0.5,1};
 	float divider = state->layout.divider;
+	float divider_height = state->layout.divider_height_in_pixels / state->window_height;
+
 	if (state->my > divider) { c.r = 0.75; c.g = 0.75; c.b = 0.75; };
 
 	push_ui_drawable(0,divider, 1,1.0-divider, c.r, c.g, c.b, c.a, &state->drawables);
 	
 	dragger(10002u, state);
 
-	if (button (0.2,0.2, 0.6,0.1, 10001u, state)) {
-		printf("Button pressed!\n");
+	if (button (0.05,divider+divider_height*0.1, 10001u, state)) {
+		//printf("Button pressed!\n");
+		Clip c = {};
+		c.start = length(project);
+		c.length = 1.0;
+		c.duration = 1.0;
+		push_clip(c, project);
 	}
+
+	for(int i=0; i<project->clip_count; i++) {
+		Clip *c = &project->clips[i*sizeof(Clip)];
+		//printf("c: %f %f %f\n", c->start, c->duration, c->length);
+		float view_width = 10.0;
+		float start = c->start / view_width;
+		float width = c->duration / view_width;
+
+		float timeline_height = 1.0-divider+divider_height;
+		float timeline_top = divider + timeline_height * 0.25;
+		push_ui_drawable(start,timeline_top, width,timeline_height*0.5, 0.185, 0.185, 0.85, 1.0, &state->drawables);
+	}
+
 }
 
 
@@ -218,7 +188,7 @@ void update_ui (State *state, Input *i)
 	if (i->mouse_down) {
 
 		if (!state->dragging) {
-			printf("mouse down!\n");
+			//printf("mouse down!\n");
 			state->just_down = true;
 			state->dragging  = true;
 			state->sx = i->mx;
@@ -233,15 +203,13 @@ void update_ui (State *state, Input *i)
 		if (state->dragging) {
 			state->just_up  = true;
 			state->dragging = false;
-			printf("mouse up\n");
+			//printf("mouse up\n");
 		}
 	}
 
 	state->drawables.count = 0;
 
 	render_timeline(state);
-
-	//push_ui_drawable(state->sx,state->sy, state->ex-state->sx, state->ey-state->sy, 0,0,1,.1, &state->drawables);
 
 	state->just_down = false;
 	if (state->just_up) {
@@ -280,7 +248,9 @@ int main (void)
 
 	state->drawables.drawables = push_array(state->temporary, UI_Drawable, MAX_UI_DRAWABLES);
 	state->layout.divider = 0.5;
-	state->layout.divider_height_in_pixels = 40.0;
+	state->layout.divider_height_in_pixels = 80.0;
+
+	project = create_project(state->permanent);
 
 	start_app();
 	open_window(update, render);
