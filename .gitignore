@@ -3,3 +3,5 @@
 *.dylib
 /blue
 /.DS_Store
+*.o
+*.dSYM
