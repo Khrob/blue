@@ -3,8 +3,11 @@
 #include <stdlib.h>
 #include <assert.h>
 
-#include "platform.h"
 #include "edit.h"
+
+#define PLATFORM_APPLE 1
+#include "platform.h"
+
 
 #define MAX_UI_DRAWABLES 256
 
@@ -235,8 +238,20 @@ void render ()
 
 int main (void)
 {
-	void *handle = dlopen("platform.dylib", RTLD_NOW);
-	
+	char path[256];
+	char platform_path[256];
+	char shader_path[256];
+	executable_path(path);
+	sprintf(platform_path, "%splatform.dylib", path);
+	sprintf(shader_path, "%sshaders.metallib", path);
+
+	// FILE *f = fopen("/Users/khrob/Desktop/log.txt", "w");
+	// fprintf(f, "path: %s\n", path);
+	// fclose(f);
+
+	void *handle = dlopen(platform_path, RTLD_NOW);
+	if (handle == NULL) { exit(17); }
+
 	open_window  = dlsym(handle, "open_window");
 	push_rect	 = dlsym(handle, "push_rect");
 	start_app    = dlsym(handle, "start_app");
@@ -252,8 +267,8 @@ int main (void)
 
 	project = create_project(state->permanent);
 
-	start_app();
-	open_window(update, render);
+	start_app(path);
+	open_window(update, render, shader_path);
 
 	return 0;
 }

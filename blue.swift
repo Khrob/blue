@@ -136,9 +136,15 @@ public func start_app ()
 	input.window_height = 384
 }
 
+var shader:String = ""
+
 @_cdecl ("open_window")
-public func open_window (update_function:update_callback_t, rc:@escaping render_callback_t)
+public func open_window (
+	update_function:update_callback_t, 
+	rc:@escaping render_callback_t,
+	shader_path:UnsafePointer<CChar>)
 {
+	shader = String(utf8String:shader_path)!
 	let frame = NSRect(x:0, y:0, width:Int(input.window_width), height:Int(input.window_height))
 	let delegate = Window_Delegate()
 	let window = NSWindow(
@@ -166,10 +172,15 @@ public func open_window (update_function:update_callback_t, rc:@escaping render_
 
 	running = true
 
-
 	var lastTime = Date()
 	var frame_counter : Double = 0
 
+	input.window_width = 1024
+	input.window_height = 768
+
+	//input.window_width  = UInt16(window.contentView?.bounds.width ?? 1024)
+	//input.window_height = UInt16(window.contentView?.bounds.height ?? 768)
+	
 	// TODO: Move the message pump somewhere independent of the windows??
 	while (running)
 	{
@@ -282,7 +293,8 @@ private class Renderer: NSObject, MTKViewDelegate
         self.commandQueue = device.makeCommandQueue()!
         super.init()
 
-        if let l = try? self.device.makeLibrary(filepath: "shaders.metallib") {
+        if let l = try? self.device.makeLibrary(filepath: shader) {
+        // if let l = try? self.device.makeLibrary(filepath: "shaders.metallib") {
         	self.library = l
         	self.init_callback()
         }

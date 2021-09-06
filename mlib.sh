@@ -1,3 +1,3 @@
 
-xcrun -sdk macosx metal -c shaders.metal -o shaders.air
-xcrun -sdk macosx metallib shaders.air -o shaders.metallib
+xcrun -sdk macosx metal -c shaders.metal -o build/shaders.air
+xcrun -sdk macosx metallib build/shaders.air   -o build/shaders.metallib
