@@ -21,4 +21,4 @@ MACOS_FRAMEWORKS="-framework VideoDecodeAcceleration
 
 clang $LIBRARIES $MACOS_FRAMEWORKS betoo.c -o betoo
 
-./betoo -test one
+./betoo test.mp4

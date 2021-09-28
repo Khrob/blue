@@ -1,4 +1,4 @@
-**blue**
+__blue__
 
 Wheel Reinvention Jam Notes
 
@@ -21,7 +21,28 @@ Decided to take the sensible route of using ffmpeg to get moving faster. Seems l
 - hit more linker errors, solved by linking macos frameworks (VideoDecodeAcceleration, CoreVideo, CoreFoundation)
 - hit still more linker errors, solved by linking -lx264
 - following more of the tutorial, apparently AVCodecParameters isn't linked or is deprecated or something.
-- 
+- Tried to find a more up to date tutorial, without success.
+
+Day 1
+-----
+
+- watched https://www.youtube.com/watch?v=fk1bxHi6iSI 
+- updated to ffmpeg 4:3 (might as well be on the latest version when I start)
+- getting width,height and bitrate for the stream codec! 
+- create a frame packet (AVPacket seems like a good thing to prealloc a bunch of these at the start of the program?)
+- mixing in some knowledge from http://dranger.com/ffmpeg/tutorial01.html to actually decode a frame. 
+
+
+
+
+
+
+__Reading a video file's format__
+
+AVFormatContext *format_context = avformat_alloc_context();
+avformat_open_input(&format_context, filename, NULL, NULL);
+AVCodec *pCodec = NULL;
+int stream = av_find_best_stream(format_context, AVMEDIA_TYPE_VIDEO, -1, -1, &pCodec, 0);
 
 
 

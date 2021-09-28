@@ -1,6 +1,11 @@
 #ifndef PLATFORM_H
 #define PLATFORM_H
 
+#include <dlfcn.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <assert.h>
+
 // Functions in the platform layer
 
 void (*push_rect) (float, float, float, float, float, float, float, float, uint16_t);
